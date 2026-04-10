@@ -8,3 +8,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(tray-app WIN32 main.cpp)
 
 target_compile_definitions(tray-app PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+set_property(TARGET tray-app PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
