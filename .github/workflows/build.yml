@@ -21,9 +21,16 @@ jobs:
       - name: Build Release
         run: cmake --build build --config Release
 
-      - name: Upload executable artifact
+      - name: Upload tray app artifact
         uses: actions/upload-artifact@v4
         with:
           name: tray-app-windows-x64
           path: build/Release/tray-app.exe
+          if-no-files-found: error
+
+      - name: Upload tray service artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tray-service-windows-x64
+          path: build/Release/tray-service.exe
           if-no-files-found: error
