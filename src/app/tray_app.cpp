@@ -11,7 +11,7 @@ namespace {
 
 struct UiMetrics {
     static constexpr int kWindowWidth = 760;
-    static constexpr int kWindowHeight = 520;
+    static constexpr int kWindowHeight = 580;
     static constexpr int kCardTop = 108;
     static constexpr int kCardHeight = 170;
     static constexpr int kLeftCardX = 24;
@@ -19,7 +19,7 @@ struct UiMetrics {
     static constexpr int kRightCardX = 392;
     static constexpr int kRightCardWidth = 340;
     static constexpr int kBottomCardTop = 302;
-    static constexpr int kBottomCardHeight = 150;
+    static constexpr int kBottomCardHeight = 210;
 };
 
 constexpr wchar_t kWindowClassName[] = L"TrayAppMainWindowClass";
@@ -390,10 +390,10 @@ void CreateControls(HWND hwnd) {
     CreateWindowW(L"BUTTON", L"\x0412\x043E\x0439\x0442\x0438", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 264, 178, 76, 30, hwnd, ControlIdToMenu(kControlLoginButton), g_app.instance, nullptr);
     CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 270, 292, 22, hwnd, ControlIdToMenu(kControlLoginError), g_app.instance, nullptr);
 
-    CreateWindowW(L"STATIC", L"\x041A\x043E\x0434 \x0430\x043A\x0442\x0438\x0432\x0430\x0446\x0438\x0438", WS_CHILD | WS_VISIBLE, 48, 334, 180, 20, hwnd, ControlIdToMenu(kControlActivationLabel), g_app.instance, nullptr);
-    CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 48, 358, 200, 28, hwnd, ControlIdToMenu(kControlActivationEdit), g_app.instance, nullptr);
-    CreateWindowW(L"BUTTON", L"\x0410\x043A\x0442\x0438\x0432\x0438\x0440\x043E\x0432\x0430\x0442\x044C", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 264, 358, 76, 30, hwnd, ControlIdToMenu(kControlActivationButton), g_app.instance, nullptr);
-    CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 392, 292, 22, hwnd, ControlIdToMenu(kControlActivationError), g_app.instance, nullptr);
+    CreateWindowW(L"STATIC", L"\x041A\x043E\x0434 \x0430\x043A\x0442\x0438\x0432\x0430\x0446\x0438\x0438", WS_CHILD | WS_VISIBLE, 48, 352, 180, 20, hwnd, ControlIdToMenu(kControlActivationLabel), g_app.instance, nullptr);
+    CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 48, 378, 200, 28, hwnd, ControlIdToMenu(kControlActivationEdit), g_app.instance, nullptr);
+    CreateWindowW(L"BUTTON", L"\x0410\x043A\x0442\x0438\x0432\x0438\x0440\x043E\x0432\x0430\x0442\x044C", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 264, 378, 112, 30, hwnd, ControlIdToMenu(kControlActivationButton), g_app.instance, nullptr);
+    CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 414, 328, 22, hwnd, ControlIdToMenu(kControlActivationError), g_app.instance, nullptr);
 
     CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 420, 154, 292, 30, hwnd, ControlIdToMenu(kControlUserInfo), g_app.instance, nullptr);
     CreateWindowW(L"STATIC", L"", WS_CHILD | WS_VISIBLE, 420, 194, 292, 30, hwnd, ControlIdToMenu(kControlLicenseInfo), g_app.instance, nullptr);
@@ -402,7 +402,7 @@ void CreateControls(HWND hwnd) {
                   L"\x0410\x043D\x0442\x0438\x0432\x0438\x0440\x0443\x0441\x043D\x0430\x044F \x0444\x0443\x043D\x043A\x0446\x0438\x043E\x043D\x0430\x043B\x044C\x043D\x043E\x0441\x0442\x044C "
                   L"\x0430\x0432\x0442\x043E\x043C\x0430\x0442\x0438\x0447\x0435\x0441\x043A\x0438 \x0431\x043B\x043E\x043A\x0438\x0440\x0443\x0435\x0442\x0441\x044F \x0431\x0435\x0437 "
                   L"\x0430\x0432\x0442\x043E\x0440\x0438\x0437\x0430\x0446\x0438\x0438 \x0438\x043B\x0438 \x043B\x0438\x0446\x0435\x043D\x0437\x0438\x0438.",
-                  WS_CHILD | WS_VISIBLE, 48, 350, 660, 54, hwnd, ControlIdToMenu(kControlBottomInfo), g_app.instance, nullptr);
+                  WS_CHILD | WS_VISIBLE, 48, 454, 660, 54, hwnd, ControlIdToMenu(kControlBottomInfo), g_app.instance, nullptr);
     CreateWindowW(L"BUTTON", kLogoutText, WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 556, 36, 176, 34, hwnd, ControlIdToMenu(kControlLogoutButton), g_app.instance, nullptr);
 
     ApplyFontToControl(kControlLoginLabel, g_app.smallFont);

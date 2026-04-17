@@ -8,9 +8,16 @@ from pathlib import Path
 
 HOST = "localhost"
 PORT = 8443
-VALID_USER = "demo"
-VALID_PASSWORD = "demo"
-VALID_ACTIVATION_CODE = "DEMO-1234-5678"
+VALID_USERS = {
+    "demo": {
+        "password": "demo",
+        "activationCode": "DEMO-1234-5678",
+    },
+    "danil": {
+        "password": "danil",
+        "activationCode": "DANIL12345-6789",
+    },
+}
 
 
 STATE = {
@@ -70,7 +77,8 @@ class MockHandler(BaseHTTPRequestHandler):
             payload = read_json(self)
             username = payload.get("username", "")
             password = payload.get("password", "")
-            if username != VALID_USER or password != VALID_PASSWORD:
+            user_info = VALID_USERS.get(username)
+            if not user_info or password != user_info["password"]:
                 json_response(self, 401, {"error": "invalid_credentials"})
                 return
 
@@ -118,7 +126,8 @@ class MockHandler(BaseHTTPRequestHandler):
                 return
 
             payload = read_json(self)
-            if payload.get("activationCode") != VALID_ACTIVATION_CODE:
+            user_info = VALID_USERS.get(subject)
+            if not user_info or payload.get("activationCode") != user_info["activationCode"]:
                 json_response(self, 400, {"error": "invalid_activation_code"})
                 return
 
