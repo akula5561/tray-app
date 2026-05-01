@@ -104,3 +104,9 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES src/
 target_compile_definitions(tray-service PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(tray-service PRIVATE tray-common tray-rpc Advapi32 Userenv Wtsapi32)
 apply_static_msvc_runtime(tray-service)
+
+add_executable(tray-control src/tools/tray_control.cpp)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "Source Files" FILES src/tools/tray_control.cpp)
+target_compile_definitions(tray-control PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(tray-control PRIVATE tray-common Advapi32)
+apply_static_msvc_runtime(tray-control)
