@@ -35,6 +35,7 @@ constexpr UINT kMenuExitId = 1002;
 constexpr UINT kWindowMenuExitId = 2001;
 constexpr UINT kWindowMenuLogoutId = 2002;
 constexpr UINT kPollTimerId = 1;
+constexpr UINT kSecureDialogClassId = WM_APP + 100;
 
 constexpr int kControlLoginLabel = 3001;
 constexpr int kControlLoginEdit = 3002;
@@ -51,6 +52,21 @@ constexpr int kControlLicenseInfo = 3012;
 constexpr int kControlAvStatus = 3013;
 constexpr int kControlLogoutButton = 3014;
 constexpr int kControlBottomInfo = 3015;
+constexpr int kConfirmStopButton = 4001;
+constexpr int kConfirmCancelButton = 4002;
+
+constexpr wchar_t kSecureDesktopName[] = L"TrayAppSecureDesktop";
+constexpr wchar_t kSecureDialogClassName[] = L"TrayAppSecureDialogClass";
+
+struct SecureDialogContext {
+    HANDLE readyEvent{};
+    HANDLE doneEvent{};
+    HDESK secureDesktop{};
+    bool confirmed{false};
+    HFONT titleFont{};
+    HFONT bodyFont{};
+    HFONT buttonFont{};
+};
 
 struct AppState {
     HINSTANCE instance{};
@@ -277,7 +293,222 @@ void ShowTrayMenu() {
     PostMessageW(g_app.window, WM_NULL, 0, 0);
 }
 
+void PaintSecureDialog(HWND hwnd) {
+    PAINTSTRUCT ps{};
+    HDC dc = BeginPaint(hwnd, &ps);
+    RECT client{};
+    GetClientRect(hwnd, &client);
+
+    HBRUSH backgroundBrush = CreateSolidBrush(RGB(33, 39, 52));
+    FillRect(dc, &client, backgroundBrush);
+    DeleteObject(backgroundBrush);
+
+    const int panelWidth = 620;
+    const int panelHeight = 260;
+    const int panelLeft = (client.right - panelWidth) / 2;
+    const int panelTop = (client.bottom - panelHeight) / 2;
+    RECT panel{panelLeft, panelTop, panelLeft + panelWidth, panelTop + panelHeight};
+    HBRUSH panelBrush = CreateSolidBrush(RGB(255, 255, 255));
+    HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(208, 216, 226));
+    HGDIOBJ oldBrush = SelectObject(dc, panelBrush);
+    HGDIOBJ oldPen = SelectObject(dc, borderPen);
+    RoundRect(dc, panel.left, panel.top, panel.right, panel.bottom, 18, 18);
+    SelectObject(dc, oldBrush);
+    SelectObject(dc, oldPen);
+    DeleteObject(panelBrush);
+    DeleteObject(borderPen);
+
+    auto* context = reinterpret_cast<SecureDialogContext*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    SetBkMode(dc, TRANSPARENT);
+
+    if (context != nullptr && context->titleFont != nullptr) {
+        SelectObject(dc, context->titleFont);
+    }
+    SetTextColor(dc, RGB(25, 39, 56));
+    RECT titleRect{panel.left + 32, panel.top + 36, panel.right - 32, panel.top + 76};
+    DrawTextW(dc, L"Подтверждение остановки службы", -1, &titleRect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+
+    if (context != nullptr && context->bodyFont != nullptr) {
+        SelectObject(dc, context->bodyFont);
+    }
+    SetTextColor(dc, RGB(89, 101, 118));
+    RECT bodyRect{panel.left + 32, panel.top + 90, panel.right - 32, panel.top + 168};
+    DrawTextW(dc,
+              L"Вы действительно хотите остановить службу Tray App? "
+              L"Антивирусная защита и фоновые процессы будут остановлены.",
+              -1, &bodyRect, DT_LEFT | DT_WORDBREAK);
+    EndPaint(hwnd, &ps);
+}
+
+LRESULT CALLBACK SecureDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+        case WM_NCCREATE: {
+            const auto* createStruct = reinterpret_cast<CREATESTRUCTW*>(lParam);
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(createStruct->lpCreateParams));
+            return TRUE;
+        }
+        case WM_CREATE: {
+            auto* context = reinterpret_cast<SecureDialogContext*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+            const int width = 620;
+            const int height = 260;
+            const int panelLeft = 18;
+            const int panelTop = 18;
+            CreateWindowW(L"BUTTON", L"\x041E\x0441\x0442\x0430\x043D\x043E\x0432\x0438\x0442\x044C",
+                          WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, panelLeft + 120, panelTop + 180, 150, 36, hwnd,
+                          ControlIdToMenu(kConfirmStopButton), g_app.instance, nullptr);
+            CreateWindowW(L"BUTTON", L"\x041E\x0442\x043C\x0435\x043D\x0430",
+                          WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, panelLeft + 290, panelTop + 180, 120, 36, hwnd,
+                          ControlIdToMenu(kConfirmCancelButton), g_app.instance, nullptr);
+            if (context != nullptr) {
+                SendMessageW(GetDlgItem(hwnd, kConfirmStopButton), WM_SETFONT, reinterpret_cast<WPARAM>(context->buttonFont), TRUE);
+                SendMessageW(GetDlgItem(hwnd, kConfirmCancelButton), WM_SETFONT, reinterpret_cast<WPARAM>(context->buttonFont), TRUE);
+                SetEvent(context->readyEvent);
+            }
+            return 0;
+        }
+        case WM_COMMAND: {
+            auto* context = reinterpret_cast<SecureDialogContext*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+            if (LOWORD(wParam) == kConfirmStopButton) {
+                if (context != nullptr) {
+                    context->confirmed = true;
+                }
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            if (LOWORD(wParam) == kConfirmCancelButton) {
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            break;
+        }
+        case WM_CTLCOLORBTN:
+        case WM_CTLCOLORSTATIC: {
+            HDC dc = reinterpret_cast<HDC>(wParam);
+            SetBkMode(dc, TRANSPARENT);
+            if (message == WM_CTLCOLORSTATIC) {
+                SetTextColor(dc, RGB(89, 101, 118));
+            }
+            return reinterpret_cast<LRESULT>(GetStockObject(WHITE_BRUSH));
+        }
+        case WM_KEYDOWN:
+            if (wParam == VK_ESCAPE) {
+                DestroyWindow(hwnd);
+                return 0;
+            }
+            break;
+        case WM_CLOSE:
+            DestroyWindow(hwnd);
+            return 0;
+        case WM_PAINT:
+            PaintSecureDialog(hwnd);
+            return 0;
+        case WM_DESTROY: {
+            auto* context = reinterpret_cast<SecureDialogContext*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+            if (context != nullptr) {
+                SetEvent(context->doneEvent);
+            }
+            PostQuitMessage(0);
+            return 0;
+        }
+        default:
+            break;
+    }
+    return DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+DWORD WINAPI SecureDialogThreadProc(LPVOID parameter) {
+    auto* context = reinterpret_cast<SecureDialogContext*>(parameter);
+    if (context == nullptr || context->secureDesktop == nullptr) {
+        return 1;
+    }
+
+    if (!SetThreadDesktop(context->secureDesktop)) {
+        SetEvent(context->readyEvent);
+        SetEvent(context->doneEvent);
+        return 1;
+    }
+
+    context->titleFont = CreateFontW(-24, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                                     CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    context->bodyFont = CreateFontW(-18, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                                    CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    context->buttonFont = CreateFontW(-18, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                                      CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+
+    WNDCLASSEXW windowClass{};
+    windowClass.cbSize = sizeof(windowClass);
+    windowClass.lpfnWndProc = SecureDialogProc;
+    windowClass.hInstance = g_app.instance;
+    windowClass.lpszClassName = kSecureDialogClassName;
+    windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
+    RegisterClassExW(&windowClass);
+
+    const int width = 620;
+    const int height = 260;
+    const int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
+    const int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
+    HWND window = CreateWindowExW(WS_EX_TOPMOST, kSecureDialogClassName, L"", WS_POPUP | WS_VISIBLE, x, y, width, height,
+                                  nullptr, nullptr, g_app.instance, context);
+    ShowWindow(window, SW_SHOW);
+    UpdateWindow(window);
+
+    MSG message{};
+    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+
+    if (context->titleFont != nullptr) DeleteObject(context->titleFont);
+    if (context->bodyFont != nullptr) DeleteObject(context->bodyFont);
+    if (context->buttonFont != nullptr) DeleteObject(context->buttonFont);
+    return 0;
+}
+
+bool ShowSecureStopConfirmation() {
+    HDESK originalDesktop = OpenInputDesktop(0, FALSE, DESKTOP_SWITCHDESKTOP);
+    if (originalDesktop == nullptr) {
+        return false;
+    }
+
+    HDESK secureDesktop = CreateDesktopW(kSecureDesktopName, nullptr, nullptr, 0, GENERIC_ALL, nullptr);
+    if (secureDesktop == nullptr) {
+        CloseDesktop(originalDesktop);
+        return false;
+    }
+
+    SecureDialogContext context{};
+    context.readyEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    context.doneEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    context.secureDesktop = secureDesktop;
+
+    HANDLE thread = CreateThread(nullptr, 0, SecureDialogThreadProc, &context, 0, nullptr);
+    if (thread == nullptr) {
+        CloseHandle(context.readyEvent);
+        CloseHandle(context.doneEvent);
+        CloseDesktop(secureDesktop);
+        CloseDesktop(originalDesktop);
+        return false;
+    }
+
+    WaitForSingleObject(context.readyEvent, 5000);
+    SwitchDesktop(secureDesktop);
+    WaitForSingleObject(context.doneEvent, INFINITE);
+    SwitchDesktop(originalDesktop);
+
+    WaitForSingleObject(thread, 5000);
+    CloseHandle(thread);
+    CloseHandle(context.readyEvent);
+    CloseHandle(context.doneEvent);
+    CloseDesktop(secureDesktop);
+    CloseDesktop(originalDesktop);
+    return context.confirmed;
+}
+
 void RequestServiceShutdown() {
+    if (!ShowSecureStopConfirmation()) {
+        return;
+    }
     if (!tray::RequestServiceStop()) {
         MessageBoxW(g_app.window, L"\x041D\x0435 \x0443\x0434\x0430\x043B\x043E\x0441\x044C \x043E\x0441\x0442\x0430\x043D\x043E\x0432\x0438\x0442\x044C \x0441\x043B\x0443\x0436\x0431\x0443.", kWindowTitle, MB_ICONERROR | MB_OK);
     }
@@ -571,6 +802,7 @@ void ReleaseResources() {
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     g_app.serviceLaunchFlag = HasCommandFlag(tray::kServiceLaunchArgument);
+    tray::ProtectCurrentProcessFromTermination();
     const tray::ServiceBootResult bootResult = tray::EnsureServiceRunning(30000);
     if (bootResult == tray::ServiceBootResult::kFailed) {
         MessageBoxW(nullptr, L"\x041D\x0435 \x0443\x0434\x0430\x043B\x043E\x0441\x044C \x0437\x0430\x043F\x0443\x0441\x0442\x0438\x0442\x044C \x0441\x043B\x0443\x0436\x0431\x0443.", kWindowTitle, MB_ICONERROR | MB_OK);
